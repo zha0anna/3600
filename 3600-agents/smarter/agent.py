@@ -145,25 +145,20 @@ class PlayerAgent:
 
         if m.move_type == MoveType.PLAIN:
             dest = self._dest_after_move(pos, m.direction)
-            dest_cell = board.get_cell(dest)
-            current_cell = board.get_cell(pos)
-            
-            # If we're on carpet, the ONLY goal is to reach a SPACE square
-            # so we can prime next turn
-            if current_cell == Cell.CARPET:
-                if dest_cell == Cell.SPACE:
-                    # Score by how productive that space is
-                    open_reach = self._total_open_reach(dest, board)
-                    best_reachable = self._best_carpet_from(dest, board)
-                    return 40 + open_reach * 3 + best_reachable * 5
-                else:
-                    return -100  # don't move to another carpet/primed/blocked square
-            
-            # If we're NOT on carpet, plain is genuinely last resort
+    
+            # What can we carpet immediately from dest?
             best_reachable = self._best_carpet_from(dest, board)
+            
+            # How much open territory exists around dest for future priming?
             open_reach = self._total_open_reach(dest, board)
+            
+            # How many primed neighbors does dest have?
             adj_primed = self._adjacent_primed_count(dest, board)
-            return best_reachable * 8 + open_reach * 1.5 + adj_primed * 4 - 50
+            
+            # Only worth moving if destination is genuinely productive
+            # High penalty keeps plains as last resort
+            score = best_reachable * 8 + open_reach * 1.5 + adj_primed * 4 - 50
+            return score
 
         return -100
 
