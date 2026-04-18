@@ -91,16 +91,21 @@ class RatTracker:
         self._confirmed_empty[:] = False
         self.belief = self._spawn_belief.copy()
 
-    def should_search(self, turns_left: int, best_board_value: float = 0.0) -> bool:
-        ev = self.best_search_ev()
-        # Require search EV to beat at least some of the likely board value.
-        margin = 0.35 * max(best_board_value, 0.0)
+    def should_search(self, turns_left: int, board_move_value: float = 0.0) -> bool:
+        """
+        Decide whether searching is better than continuing board play.
+        """
+        p_max = max(self.belief)
+        search_ev = 6.0 * p_max - 2.0   # +4 hit, -2 miss
 
-        if turns_left <= 5:
-            return ev >= max(1.0, margin)
-        if turns_left <= 12:
-            return ev >= max(0.75, margin)
-        return ev >= max(0.4, margin)
+        # Early/mid game: board moves are more valuable, so require a margin
+        margin = 1.5
+        if turns_left <= 8:
+            margin = 0.5
+        elif turns_left <= 15:
+            margin = 1.0
+
+        return search_ev > board_move_value + margin
 
     def best_search_target(self) -> Tuple[int, int]:
         idx = int(np.argmax(self.belief))
@@ -124,6 +129,13 @@ class RatTracker:
 
     def _predict(self):
         self.belief = self.belief @ self.T
+        total = self.belief.sum()
+
+        if total == 0 or not np.isfinite(total):
+            # Reset to uniform if broken
+            self.belief = np.ones_like(self.belief) / len(self.belief)
+        else:
+            self.belief /= total
 
     def _observe_noise(self, noise: Noise, board):
         noise_idx = int(noise)
@@ -133,14 +145,28 @@ class RatTracker:
             cell_type = board.get_cell(pos)
             weights[i] = NOISE_PROBS[cell_type][noise_idx]
         self.belief *= weights
+        total = self.belief.sum()
+
+        if total == 0 or not np.isfinite(total):
+            # Reset to uniform if broken
+            self.belief = np.ones_like(self.belief) / len(self.belief)
+        else:
+            self.belief /= total
 
     def _observe_distance(self, observed: int, worker_pos: Tuple[int, int]):
         weights = np.zeros(self.N, dtype=np.float64)
-        for i in range(self.N):
+        for i in range(self.N): #for each square, compute distance from worker to square, and likelihood that being actual distance
             rat_pos = _idx_to_pos(i)
             actual = _manhattan(worker_pos, rat_pos)
             weights[i] = self._distance_likelihood(observed, actual)
         self.belief *= weights
+        total = self.belief.sum()
+
+        if total == 0 or not np.isfinite(total):
+            # Reset to uniform if broken
+            self.belief = np.ones_like(self.belief) / len(self.belief)
+        else:
+            self.belief /= total
 
     def _distance_likelihood(self, observed: int, actual: int) -> float:
         prob = 0.0

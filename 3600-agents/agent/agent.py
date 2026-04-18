@@ -69,14 +69,32 @@ class PlayerAgent:
             return Move.search(self.rat_tracker.best_search_target())
         if not board_moves:
             return random.choice(moves)
+        
+        # --- GREEDY CARPET RULE ---
+        best_carpet = None
+        best_carpet_pts = -1
+
+        for m in board_moves:
+            if m.move_type == MoveType.CARPET:
+                pts = CARPET_POINTS_TABLE.get(m.roll_length, -99)
+                if pts > best_carpet_pts:
+                    best_carpet_pts = pts
+                    best_carpet = m
+
+        # Always take strong carpets
+        if best_carpet and best_carpet_pts >= 4:
+            return best_carpet
 
         best_board_move, best_board_value = self._choose_board_move(board, board_moves, time_left)
 
         if self.rat_tracker is not None:
             turns_left = board.player_worker.turns_left
-            if self.rat_tracker.should_search(turns_left, best_board_value):
+            target = self.rat_tracker.best_search_target()
+            p_max = self.rat_tracker.get_belief_at(target)
+
+            if p_max > 0.65 or (p_max > 0.5 and turns_left <= 8):
                 self._search_count += 1
-                return Move.search(self.rat_tracker.best_search_target())
+                return Move.search(target)
 
         if best_board_move.move_type == MoveType.CARPET:
             self._carpet_count += 1
@@ -119,7 +137,7 @@ class PlayerAgent:
         best_move = ordered[0]
         best_value = -math.inf
 
-        max_depth = 2
+        max_depth = 3
         if remaining > 45:
             max_depth = 3
         if remaining > 120 and len(ordered) <= 8:
@@ -229,15 +247,16 @@ class PlayerAgent:
         my_territory = self._territory_value(board, my_pos, opp_pos)
         opp_territory = self._territory_value(board, opp_pos, my_pos)
 
-        center_bonus = -0.25 * self._dist_to_center(my_pos) + 0.25 * self._dist_to_center(opp_pos)
-        intercept = -0.35 * self._manhattan(my_pos, opp_pos)
+        center_bonus = -0.15 * self._dist_to_center(my_pos) + 0.15 * self._dist_to_center(opp_pos)
+        intercept = -0.15 * self._manhattan(my_pos, opp_pos)
 
         return (
             12.0 * score_diff
-            + 5.0 * (my_immediate - opp_immediate)
-            + 2.0 * (my_prime_potential - opp_prime_potential)
-            + 0.35 * (my_mobility - opp_mobility)
-            + 0.60 * (my_territory - opp_territory)
+            + 7.5 * my_immediate
+            - 9.0 * opp_immediate
+            + 2.5 * (my_prime_potential - opp_prime_potential)
+            + 0.25 * (my_mobility - opp_mobility)
+            + 0.30 * (my_territory - opp_territory)
             + center_bonus
             + intercept
         )

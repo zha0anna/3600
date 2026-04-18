@@ -15,6 +15,9 @@ class PlayerAgent:
         self.turn = 0
         self.total_points = 0
         self._search_count = 0
+        self._carpet_count = 0
+        self._prime_count = 0
+        self._plain_count = 0
 
         if transition_matrix is not None:
             self.rat_tracker = RatTracker(transition_matrix, board)
