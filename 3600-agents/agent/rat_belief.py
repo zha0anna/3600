@@ -126,7 +126,12 @@ class RatBeliefHMM:
         return self.index_to_pos(best_index), confidence, entropy
 
     def best_search_target(self) -> Tuple[int, int]:
-        return self.index_to_pos(int(np.argmax(self.belief)))
+        max_val = np.max(self.belief)
+        # Give a tiny tolerance for floating point math matching
+        best_indices = np.where(self.belief >= max_val - 1e-9)[0]
+        # Randomly choose amongst the equal probabilities instead of defaulting to top-left
+        chosen = int(np.random.choice(best_indices))
+        return self.index_to_pos(chosen)
 
     def get_belief_at(self, pos: Tuple[int, int]) -> float:
         return float(self.belief[self.pos_to_index(pos)])
