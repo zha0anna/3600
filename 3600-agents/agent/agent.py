@@ -8,7 +8,7 @@ import random
 from game.enums import BOARD_SIZE, CARPET_POINTS_TABLE, Cell, Direction, MoveType
 from game.move import Move
 
-from .rat_tracker import RatTracker
+from .rat_belief import RatBeliefHMM
 
 
 class PlayerAgent:
@@ -37,7 +37,8 @@ class PlayerAgent:
         self._plain_count = 0
         self._nodes = 0
 
-        self.rat_tracker = RatTracker(transition_matrix, board) if transition_matrix is not None else None
+        self.rat_tracker = RatBeliefHMM(transition_matrix) if transition_matrix is not None else None
+        self._belief_turn_count = 0
 
     def commentate(self):
         return (
@@ -108,22 +109,26 @@ class PlayerAgent:
         if self.rat_tracker is None:
             return
 
-        opp_loc, opp_hit = board.opponent_search
-        if opp_loc is not None:
-            if opp_hit:
-                self.rat_tracker.record_hit(board)
-            else:
-                self.rat_tracker.record_opponent_miss(opp_loc)
-
-        if sensor_data is not None:
-            self.rat_tracker.update(sensor_data, worker_pos, board)
-
+        # Our own previous search: hit respawns the rat, miss zeros that square.
         our_loc, our_hit = board.player_search
         if our_loc is not None:
             if our_hit:
-                self.rat_tracker.record_hit(board)
+                self.rat_tracker.reset_to_spawn()
             else:
-                self.rat_tracker.record_our_miss(our_loc)
+                self.rat_tracker.apply_search_evidence(our_loc, False)
+
+        # Between our turns the rat moves twice (once before opponent, once before us).
+        # Player A's very first turn is the exception: only one step since T_1000 init.
+        is_first_a = (self._belief_turn_count == 0 and board.is_player_a_turn)
+        if not is_first_a:
+            self.rat_tracker.predict()
+            opp_loc, opp_hit = board.opponent_search
+            self.rat_tracker.apply_search_evidence(opp_loc, opp_hit)
+
+        if sensor_data is not None:
+            self.rat_tracker.update(board, sensor_data)
+
+        self._belief_turn_count += 1
 
     def _choose_board_move(self, board, board_moves: List[Move], time_left: Callable) -> Tuple[Move, float]:
         ordered = sorted(board_moves, key=lambda m: self._move_order_key(board, m), reverse=True)
