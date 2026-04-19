@@ -155,7 +155,7 @@ class PlayerAgent:
             for move in ordered:
                 if time_left() <= deadline:
                     break
-                next_board = board.forecast_move(move)
+                next_board = board.forecast_move(move) #simulate the move to get the next board state
                 if next_board is None:
                     continue
                 next_board.reverse_perspective()
@@ -225,7 +225,7 @@ class PlayerAgent:
             return 50 + self._plain_local_value(board, move)
         return -999
 
-    def _evaluate(self, board) -> float:
+    def _evaluate(self, board) -> float: #evaluate the board state from the perspective of the current player, higher is better
         me = board.player_worker
         opp = board.opponent_worker
         my_pos = me.get_location()

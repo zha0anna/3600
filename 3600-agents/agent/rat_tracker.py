@@ -111,10 +111,6 @@ class RatTracker:
         idx = int(np.argmax(self.belief))
         return _idx_to_pos(idx)
 
-    def best_search_ev(self) -> float:
-        p = float(np.max(self.belief))
-        return 4.0 * p - 2.0 * (1.0 - p)
-
     def top_k_targets(self, k: int = 5) -> List[Tuple[Tuple[int, int], float]]:
         k = max(1, min(k, self.N))
         idxs = np.argpartition(-self.belief, k - 1)[:k]
