@@ -109,6 +109,20 @@ class PlayerAgent:
             return Move.search(self.rat_tracker.best_search_target())
         if not board_moves:
             return random.choice(moves)
+        
+        #carpet greed rule
+        best_carpet = None
+        best_pts = -1
+
+        for m in board_moves:
+            if m.move_type == MoveType.CARPET:
+                pts = CARPET_POINTS_TABLE.get(m.roll_length, 0)
+                if pts > best_pts:
+                    best_pts = pts
+                    best_carpet = m
+
+        if best_carpet and best_pts >= 6:
+            return best_carpet
 
         best_board_move, best_board_value, best_immediate = self._choose_board_move(
             board, board_moves, time_left
@@ -121,7 +135,7 @@ class PlayerAgent:
             search_ev = 6.0 * p_max - 2.0
 
             margin = 1.0
-            if turns_left <= 6: margin = 0.0
+            if turns_left <= 6: margin = 0.0 #encourage searching at end of game
             elif turns_left <= 12: margin = 0.5
 
             if search_ev > best_immediate + margin or p_max > 0.6:
