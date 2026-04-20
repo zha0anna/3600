@@ -45,7 +45,7 @@ class PlayerAgent:
     SAFETY_BUFFER = 5.0
     MAX_ITERATIVE_DEPTH = 24
     TIME_CHECK_PERIOD = 512
-    ASPIRATION_WINDOW = 8.0
+    ASPIRATION_WINDOW = 40.0
 
     def __init__(self, board, transition_matrix=None, time_left: Callable | None = None):
         self.turn = 0
@@ -358,7 +358,9 @@ class PlayerAgent:
                     break
 
         flag = TT_UPPER if value <= original_alpha else TT_LOWER if value >= original_beta else TT_EXACT
-        self._tt[tt_key] = (depth, value, flag, self._move_key(best_local_move) if best_local_move else tt_move_key)
+        # Depth-preferred replacement: don't overwrite a deeper cached result
+        if cached is None or cached[0] <= depth:
+            self._tt[tt_key] = (depth, value, flag, self._move_key(best_local_move) if best_local_move else tt_move_key)
         return value
 
     # ------------------------------------------------------------------
@@ -497,9 +499,11 @@ class PlayerAgent:
         opp_mob, opp_imm_carp, opp_prime_pot = self._fast_eval_worker(opp_pos, my_pos, board)
 
         trap_pen = 0.0
-        if my_mob <= 1: trap_pen -= 6.0
+        if my_mob == 0: trap_pen -= 12.0
+        elif my_mob == 1: trap_pen -= 6.0
         elif my_mob <= 2: trap_pen -= 2.0
-        if opp_mob <= 1: trap_pen += 6.0
+        if opp_mob == 0: trap_pen += 12.0
+        elif opp_mob == 1: trap_pen += 6.0
         elif opp_mob <= 2: trap_pen += 2.0
 
         my_territory = self._fast_territory(board, my_pos, opp_pos)
@@ -510,8 +514,7 @@ class PlayerAgent:
 
         return (
             12.0 * score_diff
-            + 7.5 * my_imm_carp
-            - 9.0 * opp_imm_carp
+            + 8.5 * (my_imm_carp - opp_imm_carp)
             + 2.5 * (my_prime_pot - opp_prime_pot)
             + 0.50 * (my_mob - opp_mob)
             + 0.30 * (my_territory - opp_territory)
